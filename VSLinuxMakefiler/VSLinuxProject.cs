@@ -15,6 +15,21 @@ namespace VSLinuxMakefiler
         public string AbsolutePath { get; } = null;
         readonly string SolutionPath = null;
 
+        public string SolutionRelativeOutputFile
+        {
+            get
+            {
+                switch (Type)
+                {
+                    case ConfigurationType.StaticLibrary: return TempProjectFolder + Name + ".a";
+                    case ConfigurationType.DynamicLibrary: return TempProjectFolder + "lib" + Name + ".so";
+                    case ConfigurationType.Executable: default: return TempProjectFolder + Name + ".exe";
+                }
+            }
+        }
+
+        string TempProjectFolder { get { return TmpFolder + "/" + Name + "/"; } }
+
         public List<string> SourceFiles { get; } = new List<string>();
         public List<string> ReferencedProjects { get; } = new List<string>();
         public List<string> LibraryDependencies { get; } = new List<string>();
@@ -106,43 +121,36 @@ namespace VSLinuxMakefiler
 
         string SolutionRelativePathToSourceFile(string sourceFile)
         {
-            return Path.GetDirectoryName(SolutionRelativePath) + "/" + sourceFile;
+            return Path.GetDirectoryName(SolutionRelativePath).Replace('\\','/') + "/" + sourceFile;
         }
-        string SolutionRelativeTempFolder(string tempFolder)
-        {
-            return tempFolder + "/" + Name;
-        }
+
         string Compiling = "echo Compiling {0}";
         string CreateFolder = "mkdir {0}/{1}";
         string Finished = "echo Compilation finished";
         string CommonCompilerFlags = "-std=c++11";
         string LibraryCompilerFlags = "-c -fPIC";
         string CompilerExecutable = "g++";
+        const string TmpFolder = "tmp";
 
-        public void WriteBuildScript(StreamWriter writer, string tmpFolder= "tmp")
+        public void WriteBuildScript(StreamWriter writer)
         {
-            //echo Compiling tinyxml2
-            //mkdir tmp/tinyxml2
-            //g++ -c -fPIC -std=c++11 3rd-party/tinyxml2/tinyxml2.cpp - o tmp/tinyxml2/ tinyxml2.o
-            //ar rcs tmp/tinyxml2.a tmp/tinyxml2/*.o
-            //echo Finished compiling tinyxml2
             writer.WriteLine(Compiling, Name);
-            writer.WriteLine(CreateFolder, tmpFolder, Name);
+            writer.WriteLine(CreateFolder, TmpFolder, Name);
 
             //1. Compile sources
-            string tempProjectFolder = SolutionRelativeTempFolder(tmpFolder) + "/";
+
             string flags = "";
             if (Type == ConfigurationType.StaticLibrary)
                 flags = LibraryCompilerFlags + " " + CommonCompilerFlags + " ";
             foreach(string sourceFile in SourceFiles)
             {
                 writer.WriteLine(CompilerExecutable + " " + flags + SolutionRelativePathToSourceFile(sourceFile)
-                    + " -o " + tempProjectFolder + Path.GetFileNameWithoutExtension(sourceFile) + ".o");
+                    + " -o " + TempProjectFolder + Path.GetFileNameWithoutExtension(sourceFile) + ".o");
             }
 
             //2. Link sources
             if (Type == ConfigurationType.StaticLibrary)
-                writer.WriteLine("ar rcs {0}{1}.a {0}*.o", tempProjectFolder, Name);
+                writer.WriteLine("ar rcs {0} {1}*.o", SolutionRelativeOutputFile, TempProjectFolder);
 
             writer.WriteLine(Finished);
             writer.WriteLine();
