@@ -77,7 +77,7 @@ namespace VSLinuxMakefiler
             }
         }
 
-        string CreateFolderStructure = "echo mkdir tmp\n";
+        string CreateFolderStructure = "mkdir tmp\n";
 
         public void GenerateBuildFile()
         {
