@@ -2,7 +2,7 @@
   "profiles": {
     "VSLinuxMakefiler": {
       "commandName": "Project",
-      "commandLineArgs": "solution=D:\\Bortx\\SimionZoo\\SimionZoo.sln"
+      "commandLineArgs": "solution=c:\\Bortx\\SimionZoo\\SimionZoo.sln"
     }
   }
 }

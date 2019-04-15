@@ -22,7 +22,7 @@ namespace VSLinuxMakefiler
                 switch (Type)
                 {
                     case ConfigurationType.StaticLibrary: return TempProjectFolder + Name + ".a";
-                    case ConfigurationType.DynamicLibrary: return TempProjectFolder + "lib" + Name + ".so";
+                    case ConfigurationType.DynamicLibrary: return TempProjectFolder + Name + ".so";
                     case ConfigurationType.Executable: default: return TempProjectFolder + Name + ".exe";
                 }
             }
@@ -32,6 +32,7 @@ namespace VSLinuxMakefiler
 
         public List<string> SourceFiles { get; } = new List<string>();
         public List<string> ReferencedProjects { get; } = new List<string>();
+        public List<string> ReferencedProjectsOutputs { get; } = new List<string>();
         public List<string> LibraryDependencies { get; } = new List<string>();
 
         public bool SuccessfullyParsed { get; set; } = false;
@@ -124,27 +125,39 @@ namespace VSLinuxMakefiler
             return Path.GetDirectoryName(SolutionRelativePath).Replace('\\','/') + "/" + sourceFile;
         }
 
-        string Compiling = "echo Compiling {0}";
-        string CreateFolder = "mkdir {0}/{1}";
-        string Finished = "echo Compilation finished";
-        string CommonCompilerFlags = "-std=c++11";
-        string LibraryCompilerFlags = "-c -fPIC";
-        string CompilerExecutable = "g++";
+        string CompilerFlags
+        {
+            get
+            {
+                if (Type == ConfigurationType.StaticLibrary)
+                    return m_libraryCompilerFlags + " " + m_commonCompilerFlags + " ";
+                return "";
+            }
+        }
+
+        string m_compilingMsg = "echo Compiling {0}...";
+        string m_createFolderScript = "mkdir {0}/{1}";
+        string m_finishedMsg = "echo ...Finished";
+        string m_commonCompilerFlags = "-std=c++11 -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
+            + " -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\" -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\""
+            + " -Wconversion -W\"return-type\" -Wparentheses -W\"no-format\" -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\""
+            + " -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";
+        string m_libraryCompilerFlags = "-c -fPIC";
+        string m_compilerExecutable = "g++";
         const string TmpFolder = "tmp";
 
         public void WriteBuildScript(StreamWriter writer)
         {
-            writer.WriteLine(Compiling, Name);
-            writer.WriteLine(CreateFolder, TmpFolder, Name);
+            writer.WriteLine(m_compilingMsg, Name);
+            writer.WriteLine(m_createFolderScript, TmpFolder, Name);
 
             //1. Compile sources
 
-            string flags = "";
-            if (Type == ConfigurationType.StaticLibrary)
-                flags = LibraryCompilerFlags + " " + CommonCompilerFlags + " ";
+            string flags = CompilerFlags;
+
             foreach(string sourceFile in SourceFiles)
             {
-                writer.WriteLine(CompilerExecutable + " " + flags + SolutionRelativePathToSourceFile(sourceFile)
+                writer.WriteLine(m_compilerExecutable + " " + flags + SolutionRelativePathToSourceFile(sourceFile)
                     + " -o " + TempProjectFolder + Path.GetFileNameWithoutExtension(sourceFile) + ".o");
             }
 
@@ -152,7 +165,7 @@ namespace VSLinuxMakefiler
             if (Type == ConfigurationType.StaticLibrary)
                 writer.WriteLine("ar rcs {0} {1}*.o", SolutionRelativeOutputFile, TempProjectFolder);
 
-            writer.WriteLine(Finished);
+            writer.WriteLine(m_finishedMsg);
             writer.WriteLine();
         }
     }
