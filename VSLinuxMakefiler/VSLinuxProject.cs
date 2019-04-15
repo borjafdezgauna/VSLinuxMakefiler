@@ -223,7 +223,8 @@ namespace VSLinuxMakefiler
                 linkCommand = string.Format("ar rcs {0} {1}*.o {2}", SolutionRelativeOutputFile, TempProjectFolder, LinkerFlags());
             else
             {
-                linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile + " " + TempProjectFolder + "*.o" ;
+                linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile + " " + TempProjectFolder + "*.o "
+                    + LinkerFlags();
                 foreach(string referencedProjectOutput in ReferencedProjectsOutputs)
                     linkCommand += " \"" + referencedProjectOutput + "\"";
                 foreach (string dependency in LibraryDependencies)
