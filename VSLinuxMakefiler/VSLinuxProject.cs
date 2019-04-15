@@ -125,23 +125,24 @@ namespace VSLinuxMakefiler
             return Path.GetDirectoryName(SolutionRelativePath).Replace('\\','/') + "/" + sourceFile;
         }
 
-        string CompilerFlags
+        string CompilerFlags (string sourceFile)
         {
-            get
-            {
-                if (Type == ConfigurationType.StaticLibrary)
-                    return m_libraryCompilerFlags + " " + m_commonCompilerFlags + " ";
-                return "";
-            }
+            string langFlags = "";
+            if (sourceFile.EndsWith(".c")) langFlags = "-x c -std=c11 ";
+            else if (sourceFile.EndsWith(".cpp")) langFlags = "-x c++ -std=c++11 ";
+
+            if (Type == ConfigurationType.StaticLibrary)
+                return m_libraryCompilerFlags + " " + m_commonCompilerFlags + " " + langFlags;
+            return "";
         }
 
         string m_compilingMsg = "echo Compiling {0}...";
         string m_createFolderScript = "mkdir {0}/{1}";
         string m_finishedMsg = "echo ...Finished";
-        string m_commonCompilerFlags = "-std=c++11 -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
+        string m_commonCompilerFlags = "-w";/* -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
             + " -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\" -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\""
             + " -Wconversion -W\"return-type\" -Wparentheses -W\"no-format\" -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\""
-            + " -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";
+            + " -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";*/
         string m_libraryCompilerFlags = "-c -fPIC";
         string m_compilerExecutable = "g++";
         const string TmpFolder = "tmp";
@@ -152,12 +153,9 @@ namespace VSLinuxMakefiler
             writer.WriteLine(m_createFolderScript, TmpFolder, Name);
 
             //1. Compile sources
-
-            string flags = CompilerFlags;
-
             foreach(string sourceFile in SourceFiles)
             {
-                writer.WriteLine(m_compilerExecutable + " " + flags + SolutionRelativePathToSourceFile(sourceFile)
+                writer.WriteLine(m_compilerExecutable + " " + CompilerFlags(sourceFile) + SolutionRelativePathToSourceFile(sourceFile)
                     + " -o " + TempProjectFolder + Path.GetFileNameWithoutExtension(sourceFile) + ".o");
             }
 
