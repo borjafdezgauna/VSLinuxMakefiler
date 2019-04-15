@@ -29,11 +29,15 @@ namespace VSLinuxMakefiler
         }
 
         string TempProjectFolder { get { return TmpFolder + "/" + Name + "/"; } }
+        string ProjectFolder { get { return Path.GetDirectoryName(SolutionRelativePath).Replace('\\','/'); } }
 
         public List<string> SourceFiles { get; } = new List<string>();
         public List<string> ReferencedProjects { get; } = new List<string>();
         public List<string> ReferencedProjectsOutputs { get; } = new List<string>();
         public List<string> LibraryDependencies { get; } = new List<string>();
+        public List<string> AdditionalSources { get; } = new List<string>();
+        public List<string> AdditionalLibraryDirectories { get; } = new List<string>();
+        public string AdditionalLinkOptions { get; set; } = "";
 
         public bool SuccessfullyParsed { get; set; } = false;
 
@@ -53,7 +57,8 @@ namespace VSLinuxMakefiler
         const string ProjectReferenceFileXPath = "/MsBuild:Project/MsBuild:ItemGroup/MsBuild:ProjectReference";
         const string AdditionalSourcesXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:AdditionalSourcesToCopyMapping";
         const string LibraryDependenciesXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:LibraryDependencies";
-       //     AdditionalLibraryDirectories
+        const string AdditionalLibraryDirectoriesXPath= "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalLibraryDirectories";
+        const string AdditionalLinkOptionsXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalOptions";
 
         const string SourceFileAttr = "Include";
 
@@ -117,6 +122,25 @@ namespace VSLinuxMakefiler
                 }
             }
 
+            //Additional library directories
+            foreach (XmlNode node in doc.SelectNodes(AdditionalLibraryDirectoriesXPath, nsmgr))
+            {
+                string dirsString = node.InnerText;
+                string[] dirs = dirsString.Split(';');
+                foreach (string dir in dirs)
+                {
+                    if (!dir.StartsWith('%') && !AdditionalLibraryDirectories.Contains(dir) && dir.Trim(' ').Length > 0)
+                        AdditionalLibraryDirectories.Add(dir.Trim(' '));
+                }
+            }
+
+            //Additional link options
+            foreach (XmlNode node in doc.SelectNodes(AdditionalLinkOptionsXPath, nsmgr))
+            {
+                AdditionalLinkOptions = node.InnerText; //if there are different configurations, just take the last one
+            }
+
+
             SuccessfullyParsed = true;
         }
 
@@ -131,9 +155,17 @@ namespace VSLinuxMakefiler
             if (sourceFile.EndsWith(".c")) langFlags = "-x c -std=c11 ";
             else if (sourceFile.EndsWith(".cpp")) langFlags = "-x c++ -std=c++11 ";
 
-            if (Type == ConfigurationType.StaticLibrary)
+            if (Type == ConfigurationType.StaticLibrary || Type == ConfigurationType.DynamicLibrary)
                 return m_libraryCompilerFlags + " " + m_commonCompilerFlags + " " + langFlags;
-            return "";
+            return m_commonCompilerFlags + " " + langFlags;
+        }
+
+        string LinkerFlags()
+        {
+            if (Type == ConfigurationType.StaticLibrary)
+                return "";
+            else //(Type == ConfigurationType.DynamicLibrary || Type ==ConfigurationType.Executable)
+                return "-Wl,--no-undefined ";
         }
 
         string m_compilingMsg = "echo Compiling {0}...";
@@ -160,8 +192,22 @@ namespace VSLinuxMakefiler
             }
 
             //2. Link sources
+            string linkCommand;
             if (Type == ConfigurationType.StaticLibrary)
-                writer.WriteLine("ar rcs {0} {1}*.o", SolutionRelativeOutputFile, TempProjectFolder);
+                linkCommand = string.Format("ar rcs {0} {1}*.o {2}", SolutionRelativeOutputFile, TempProjectFolder, LinkerFlags());
+            else
+            {
+                linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile + " " + TempProjectFolder + "*.o" ;
+                foreach(string referencedProjectOutput in ReferencedProjectsOutputs)
+                    linkCommand += " \"" + referencedProjectOutput + "\"";
+                foreach (string dependency in LibraryDependencies)
+                    linkCommand += " -l\"" + dependency + "\"";
+                foreach (string additionalDir in AdditionalLibraryDirectories)
+                    //-Wl,-L/home/bortx/projects/SimionZoo/RLSimion/CNTKWrapper/../../bin
+                    linkCommand += " -Wl,-L\"" + ProjectFolder + "/" + additionalDir + "\"";
+                if (AdditionalLinkOptions != "") linkCommand += " " + AdditionalLinkOptions;
+            }
+            writer.WriteLine(linkCommand);
 
             writer.WriteLine(m_finishedMsg);
             writer.WriteLine();
