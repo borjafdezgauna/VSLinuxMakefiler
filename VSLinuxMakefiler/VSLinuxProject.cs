@@ -38,6 +38,7 @@ namespace VSLinuxMakefiler
         public List<string> AdditionalSources { get; } = new List<string>();
         public List<string> AdditionalLibraryDirectories { get; } = new List<string>();
         public string AdditionalLinkOptions { get; set; } = "";
+        public Dictionary<string, string> AdditionalSourcesToCopyMapping { get; } = new Dictionary<string, string>();
 
         public bool SuccessfullyParsed { get; set; } = false;
 
@@ -55,7 +56,7 @@ namespace VSLinuxMakefiler
         const string ConfigurationTypeXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:ConfigurationType";
         const string SourceFileXPath = "/MsBuild:Project/MsBuild:ItemGroup/MsBuild:ClCompile";
         const string ProjectReferenceFileXPath = "/MsBuild:Project/MsBuild:ItemGroup/MsBuild:ProjectReference";
-        const string AdditionalSourcesXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:AdditionalSourcesToCopyMapping";
+        const string AdditionalSourcesToCopyMappingXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:AdditionalSourcesToCopyMapping";
         const string LibraryDependenciesXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:LibraryDependencies";
         const string AdditionalLibraryDirectoriesXPath= "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalLibraryDirectories";
         const string AdditionalLinkOptionsXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalOptions";
@@ -140,6 +141,23 @@ namespace VSLinuxMakefiler
                 AdditionalLinkOptions = node.InnerText; //if there are different configurations, just take the last one
             }
 
+            //Additional sources to copy mapping
+            foreach (XmlNode node in doc.SelectNodes(AdditionalSourcesToCopyMappingXPath, nsmgr))
+            {
+                string mappingString = node.InnerText;
+                string[] mappings = mappingString.Split(';');
+                foreach (string mapping in mappings)
+                {
+                    int separatorIndex= mapping.IndexOf(":=");
+                    if (separatorIndex>0)
+                    {
+                        string source = mapping.Substring(0, separatorIndex);
+                        string dst = mapping.Substring(separatorIndex + 2);
+                        AdditionalSourcesToCopyMapping[source] = dst;
+                    }
+                }
+            }
+
 
             SuccessfullyParsed = true;
         }
@@ -164,10 +182,12 @@ namespace VSLinuxMakefiler
         {
             if (Type == ConfigurationType.StaticLibrary)
                 return "";
-            else //(Type == ConfigurationType.DynamicLibrary || Type ==ConfigurationType.Executable)
-                return "-Wl,--no-undefined ";
+            else if (Type == ConfigurationType.DynamicLibrary)
+                return "-Wl,--no-undefined -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -shared ";
+            else return "-Wl,--no-undefined ";
         }
 
+        string m_copyFileCommand = "cp {0} {1}";
         string m_compilingMsg = "echo Compiling {0}...";
         string m_createFolderScript = "mkdir {0}/{1}";
         string m_finishedMsg = "echo ...Finished";
@@ -183,6 +203,12 @@ namespace VSLinuxMakefiler
         {
             writer.WriteLine(m_compilingMsg, Name);
             writer.WriteLine(m_createFolderScript, TmpFolder, Name);
+
+            //0. Copy additional sources to temp folder
+            foreach(string additionalSource in AdditionalSourcesToCopyMapping.Keys)
+            {
+                writer.WriteLine(m_copyFileCommand, SolutionRelativePathToSourceFile(additionalSource), TempProjectFolder);
+            }
 
             //1. Compile sources
             foreach(string sourceFile in SourceFiles)
@@ -203,8 +229,9 @@ namespace VSLinuxMakefiler
                 foreach (string dependency in LibraryDependencies)
                     linkCommand += " -l\"" + dependency + "\"";
                 foreach (string additionalDir in AdditionalLibraryDirectories)
-                    //-Wl,-L/home/bortx/projects/SimionZoo/RLSimion/CNTKWrapper/../../bin
                     linkCommand += " -Wl,-L\"" + ProjectFolder + "/" + additionalDir + "\"";
+                if (AdditionalSourcesToCopyMapping.Keys.Count > 0)
+                    linkCommand += " -Wl,-L\"" + TempProjectFolder + "\""; //manually add the temp project as an additional library dir because we are copying there the additional libraries
                 if (AdditionalLinkOptions != "") linkCommand += " " + AdditionalLinkOptions;
             }
             writer.WriteLine(linkCommand);
