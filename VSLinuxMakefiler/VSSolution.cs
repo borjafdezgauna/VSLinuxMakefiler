@@ -45,6 +45,7 @@ namespace VSLinuxMakefiler
             int index = m_projects.FindIndex(project => project.Name == projectName);
             return index;
         }
+
         bool FixFirstDependencyOrderError()
         {
             for(int i= 0; i<m_projects.Count; i++)
@@ -65,8 +66,10 @@ namespace VSLinuxMakefiler
             }
             return true;
         }
-        void SortProjects()
+
+        void SortProjectsAndReferences()
         {
+            //1. Sort the projects
             const int maxNumIterations = 100;
             int numIterations = 0;
             bool projectsOrdered = FixFirstDependencyOrderError();
@@ -75,23 +78,33 @@ namespace VSLinuxMakefiler
                 projectsOrdered = FixFirstDependencyOrderError();
                 numIterations++;
             }
+            if (numIterations == maxNumIterations)
+            {
+                Console.WriteLine("Warning: maximum number of iterations reached while sorting projects and references");
+            }
+            //2. Reorder referenced projects and resolve references
+            foreach(VSLinuxProject project in m_projects)
+            {
+                project.ReferencedProjects.Sort((x, y) => ProjectIndex(y).CompareTo(ProjectIndex(x)));
+
+                //Resolve dependencies
+                foreach (string reference in project.ReferencedProjects)
+                {
+                    //for simplicity, we only include referenced static libraries in the linking phase
+                    if (m_projectsByName[reference].Type == VSLinuxProject.ConfigurationType.StaticLibrary)
+                        project.ReferencedProjectsOutputs.Add(m_projectsByName[reference].SolutionRelativeOutputFile);
+                }
+            }
         }
 
-        string CreateFolderStructure = "echo mkdir tmp\n";
+        string CreateFolderStructure = "mkdir tmp\n";
 
         public void GenerateBuildFile()
         {
-            //1. Resolve dependencies
-            foreach(VSLinuxProject project in m_projects)
-            {
-                //Resolve dependencies
-                foreach(string reference in project.ReferencedProjects)
-                    project.ReferencedProjectsOutputs.Add(m_projectsByName[reference].SolutionRelativeOutputFile);
-            }
-            //2. Sort projects according to the dependencies
-            SortProjects();
+            //1. Resolve referenced projects, and sort the projects/references them according to the dependencies
+            SortProjectsAndReferences();
 
-            //3. Generate the build file
+            //2. Generate the build file
             string outputFilename = m_solutionPath + "/build-linux.sh";
 
             Console.WriteLine("Generating build script " + outputFilename);

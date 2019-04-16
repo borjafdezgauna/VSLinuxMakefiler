@@ -173,9 +173,11 @@ namespace VSLinuxMakefiler
             if (sourceFile.EndsWith(".c")) langFlags = "-x c -std=c11 ";
             else if (sourceFile.EndsWith(".cpp")) langFlags = "-x c++ -std=c++11 ";
 
-            if (Type == ConfigurationType.StaticLibrary || Type == ConfigurationType.DynamicLibrary)
-                return m_libraryCompilerFlags + " " + m_commonCompilerFlags + " " + langFlags;
-            return m_commonCompilerFlags + " " + langFlags;
+            string flags = m_commonCompilerFlags + " " + langFlags;
+            if (Type == ConfigurationType.DynamicLibrary || Type == ConfigurationType.StaticLibrary)
+                flags += m_compileLibraryFlags + " ";
+
+            return flags;
         }
 
         string LinkerFlags()
@@ -191,11 +193,11 @@ namespace VSLinuxMakefiler
         string m_compilingMsg = "echo Compiling {0}...";
         string m_createFolderScript = "mkdir {0}/{1}";
         string m_finishedMsg = "echo ...Finished";
-        string m_commonCompilerFlags = "-w";/* -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
+        string m_commonCompilerFlags = "-c -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
             + " -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\" -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\""
             + " -Wconversion -W\"return-type\" -Wparentheses -W\"no-format\" -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\""
-            + " -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";*/
-        string m_libraryCompilerFlags = "-c -fPIC";
+            + " -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";
+        string m_compileLibraryFlags = "-fPIC";
         string m_compilerExecutable = "g++";
         const string TmpFolder = "tmp";
 
@@ -220,13 +222,15 @@ namespace VSLinuxMakefiler
             //2. Link sources
             string linkCommand;
             if (Type == ConfigurationType.StaticLibrary)
+            {
                 linkCommand = string.Format("ar rcs {0} {1}*.o {2}", SolutionRelativeOutputFile, TempProjectFolder, LinkerFlags());
+            }
             else
             {
                 linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile + " " + TempProjectFolder + "*.o "
                     + LinkerFlags();
-                foreach(string referencedProjectOutput in ReferencedProjectsOutputs)
-                    linkCommand += " \"" + referencedProjectOutput + "\"";
+                foreach (string referencedProjectOutput in ReferencedProjectsOutputs)
+                    linkCommand += " \"" + referencedProjectOutput + "\""; //don't use in the linking phase unless it's a static
                 foreach (string dependency in LibraryDependencies)
                     linkCommand += " -l\"" + dependency + "\"";
                 foreach (string additionalDir in AdditionalLibraryDirectories)
