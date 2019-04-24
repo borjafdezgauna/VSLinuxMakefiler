@@ -7,7 +7,7 @@ namespace VSLinuxMakefiler
 {
     public class VSLinuxProject
     {
-        public enum ConfigurationType { Executable, StaticLibrary, DynamicLibrary };
+        public enum ConfigurationType { Executable, StaticLibrary, DynamicLibrary, UnitTest };
 
         public ConfigurationType Type { get; set; } = ConfigurationType.Executable;
         public string Name { get; } = null;
@@ -21,9 +21,11 @@ namespace VSLinuxMakefiler
             {
                 switch (Type)
                 {
+                    case ConfigurationType.UnitTest: return TempProjectFolder + Name + ".exe";
                     case ConfigurationType.StaticLibrary: return TempProjectFolder + Name + ".a";
                     case ConfigurationType.DynamicLibrary: return TempProjectFolder + Name + ".so";
                     case ConfigurationType.Executable: default: return TempProjectFolder + Name + ".exe";
+                    
                 }
             }
         }
@@ -52,7 +54,8 @@ namespace VSLinuxMakefiler
             ParseVSLinuxProject(AbsolutePath);
         }
 
-        const string ApplicationTypeXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:ApplicationType";
+        public const string ApplicationTypeXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:ApplicationType";
+        public const string ProjectSubTypeXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:ProjectSubType";
         const string ConfigurationTypeXPath = "/MsBuild:Project/MsBuild:PropertyGroup/MsBuild:ConfigurationType";
         const string SourceFileXPath = "/MsBuild:Project/MsBuild:ItemGroup/MsBuild:ClCompile";
         const string ProjectReferenceFileXPath = "/MsBuild:Project/MsBuild:ItemGroup/MsBuild:ProjectReference";
@@ -88,6 +91,12 @@ namespace VSLinuxMakefiler
             {
                 if (node.InnerText == "StaticLibrary") Type = ConfigurationType.StaticLibrary;
                 else if (node.InnerText == "DynamicLibrary") Type = ConfigurationType.DynamicLibrary;
+            }
+            //override the project type if it is a native unit test project
+            foreach (XmlNode node in doc.SelectNodes(VSLinuxProject.ProjectSubTypeXPath, nsmgr))
+            {
+                if (node.InnerText == "NativeUnitTestProject")
+                    Type = ConfigurationType.UnitTest;
             }
 
             //Source files

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace VSLinuxMakefiler
 {
@@ -12,6 +13,34 @@ namespace VSLinuxMakefiler
         List<VSLinuxProject> m_projects = new List<VSLinuxProject>();
         Dictionary<string, VSLinuxProject> m_projectsByName = new Dictionary<string, VSLinuxProject>();
         string m_solutionPath = null;
+
+        bool IsProjectTypeSupported(string projectPath)
+        {
+            XmlDocument doc = new XmlDocument();
+            doc.Load(projectPath);
+
+            XmlNamespaceManager nsmgr = new XmlNamespaceManager(doc.NameTable);
+
+            //add a namespace manager if xmlns is defined
+            if (doc.DocumentElement.Attributes["xmlns"] != null)
+            {
+                string xmlns = doc.DocumentElement.Attributes["xmlns"].Value;
+                nsmgr.AddNamespace("MsBuild", xmlns);
+            }
+
+            //return true if it is a VSLinux project
+            foreach (XmlNode node in doc.SelectNodes(VSLinuxProject.ApplicationTypeXPath, nsmgr))
+            {
+                if (node.InnerText == "Linux")
+                    return true;
+            }
+            foreach (XmlNode node in doc.SelectNodes(VSLinuxProject.ProjectSubTypeXPath, nsmgr))
+            {
+                if (node.InnerText == "NativeUnitTestProject")
+                    return true;
+            }
+            return false;
+        }
 
         public bool Parse(string solutionFilename)
         {
@@ -27,7 +56,7 @@ namespace VSLinuxMakefiler
                 projectName = match.Groups[1].Value.Replace('\\','/');
                 projectPath = match.Groups[2].Value.Replace('\\', '/');
 
-                if (projectPath.EndsWith("-linux.vcxproj"))
+                if (projectPath.EndsWith(".vcxproj") && IsProjectTypeSupported(projectPath))
                 {
                     VSLinuxProject project = new VSLinuxProject(projectName, projectPath, m_solutionPath);
                     if (project.SuccessfullyParsed)
@@ -99,7 +128,7 @@ namespace VSLinuxMakefiler
 
         string CreateFolderStructure = "mkdir tmp\n";
 
-        public void GenerateBuildFile()
+        public void GenerateBuildFile(string cppUnitTestHeaderFilePath)
         {
             //1. Resolve referenced projects, and sort the projects/references them according to the dependencies
             SortProjectsAndReferences();
