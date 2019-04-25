@@ -2,7 +2,7 @@
   "profiles": {
     "VSLinuxMakefiler": {
       "commandName": "Project",
-      "commandLineArgs": "solution=c:\\Bortx\\SimionZoo\\SimionZoo.sln"
+      "commandLineArgs": "solution=D:\\Repos\\SimionZoo\\SimionZoo.sln cppUnitTestHeaderDir=tests\\linux"
     }
   }
 }
