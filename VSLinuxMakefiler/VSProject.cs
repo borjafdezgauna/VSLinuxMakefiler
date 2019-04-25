@@ -143,7 +143,8 @@ namespace VSLinuxMakefiler
                 string[] dirs = dirsString.Split(';');
                 foreach (string dir in dirs)
                 {
-                    if (!dir.StartsWith('%') && !AdditionalLibraryDirectories.Contains(dir) && dir.Trim(' ').Length > 0)
+                    //Discard directories with wildcards: either starting with '%' or containing'$('
+                    if (!dir.StartsWith('%') && !dir.Contains("$(") && !AdditionalLibraryDirectories.Contains(dir) && dir.Trim(' ').Length > 0)
                         AdditionalLibraryDirectories.Add(dir.Trim(' '));
                 }
             }
