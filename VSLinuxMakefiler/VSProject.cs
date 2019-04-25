@@ -184,9 +184,8 @@ namespace VSLinuxMakefiler
         public abstract string LinkerFlags();
 
         string m_copyFileCommand = "cp {0} {1}";
-        string m_compilingMsg = "echo Compiling {0}...";
+        string m_compilingMsg = "echo [{0}]";
         string m_createFolderScript = "mkdir {0}/{1}";
-        string m_finishedMsg = "echo ...Finished";
         protected string m_commonCompilerFlags = "-c -g2 -gdwarf-2 -w -Wswitch -W\"no-deprecated-declarations\" -W\"empty-body\" -W\"return-type\" -Wparentheses -W\"no-format\""
             + " -Wuninitialized -W\"unreachable-code\" -W\"unused-function\" -W\"unused-value\" -W\"unused-variable\" -Wswitch -W\"no-deprecated-declarations\""
             + " -Wconversion -O0 -fno-strict-aliasing -fno-omit-frame-pointer -fthreadsafe-statics -fexceptions -frtti";
@@ -245,7 +244,6 @@ namespace VSLinuxMakefiler
             //2. Link sources
             WriteLinkSources(writer);
 
-            writer.WriteLine(m_finishedMsg);
             writer.WriteLine();
         }
     }

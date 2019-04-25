@@ -143,13 +143,14 @@ namespace VSLinuxMakefiler
                 writer.WriteLine(CreateFolderStructure);
 
                 //Build all the projects
-                foreach (VSProject project in m_projects)
-                {
-                    project.WriteBuildScript(writer);
-                }
+                writer.WriteLine("echo #### 1. Compile the projects");
+                foreach (VSProject project in m_projects) project.WriteBuildScript(writer);
 
                 //Run all the tests
-                //TODO
+                writer.WriteLine("echo #### 2. Run unit tests");
+                foreach (VSProject project in m_projects)
+                    if (project.Type() ==VSProject.ProjectType.UnitTest)
+                        writer.WriteLine (project.SolutionRelativeOutputFile());
             }
         }
     }
