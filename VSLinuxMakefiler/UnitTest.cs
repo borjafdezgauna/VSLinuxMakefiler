@@ -48,8 +48,6 @@ namespace VSLinuxMakefiler
                 writer.WriteLine(OutputFileHeader);
                 foreach (string unitTestSourceFile in m_unitTestSourceFiles)
                     writer.WriteLine(OutputFileIncludeUnitTestSource, unitTestSourceFile);
-                foreach (UnitTestNamespace unitTestNamespace in m_unitTestNamespaces)
-                    writer.WriteLine(OutputFileUsingNamespace, unitTestNamespace.Name);
                 writer.WriteLine(OutputFileBeginMain);
                 foreach (UnitTestNamespace unitTestNamespace in m_unitTestNamespaces)
                 {
@@ -57,7 +55,7 @@ namespace VSLinuxMakefiler
                     {
                         foreach (string unitTestMethod in unitTestClass.Methods)
                         {
-                            writer.WriteLine(string.Format(OutputFileTestMethod, unitTestClass.Name, unitTestMethod));
+                            writer.WriteLine(string.Format(OutputFileTestMethod, unitTestNamespace.Name, unitTestClass.Name, unitTestMethod));
                         }
                     }
                 }
@@ -68,12 +66,11 @@ namespace VSLinuxMakefiler
         //Constants used to generate the preprocessed source file
         public const string OutputFileHeader = "#include <iostream>";
         public const string OutputFileIncludeUnitTestSource = "#include \"{0}\"";
-        public const string OutputFileUsingNamespace = "using namespace {0};";
         public const string OutputFileIncludeUnit = "#include \"{0}\"";
         public const string OutputFileBeginMain = "int main()\n{\n  bool success= true;\n";
         public const string OutputFileEndMain = "  return success;\n}";
-        public const string OutputFileTestMethod = "  try\n  {{\n    {0}::{1}();\n    std::cout << \"Passed {0}::{1}()\\n\";\n  }}\n  catch(std::runtime_error error)\n  {{\n    success= false;\n"
-            + "    std::cout << \"Failed {0}::{1}()\\n\";\n  }}";
+        public const string OutputFileTestMethod = "  try\n  {{\n    {0}::{1}::{2}();\n    std::cout << \"Passed {2}()\\n\";\n  }}\n  catch(std::runtime_error error)\n  {{\n    success= false;\n"
+            + "    std::cout << \"Failed {2}()\\n\";\n  }}";
 
         public override string CompilerFlags(string sourceFile)
         {
