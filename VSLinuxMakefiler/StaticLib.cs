@@ -30,7 +30,7 @@ namespace VSLinuxMakefiler
 
         public override string LinkerFlags()
         {
-            return "-Wl,--no-undefined -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -shared ";
+            return "";
         }
 
         protected override void WriteLinkSources(StreamWriter writer)
