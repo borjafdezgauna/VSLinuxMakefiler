@@ -105,9 +105,17 @@ namespace VSLinuxMakefiler
                     {
                         if (!project.ReferencedProjects.Contains(secondaryReference) && !secondaryReferences.Contains(secondaryReference))
                             secondaryReferences.Add(secondaryReference);
+                    }
+                }
+                project.ReferencedProjects.AddRange(secondaryReferences);
+                secondaryReferences.Clear();
 
-                        //If it is a unit test, we expect referenced projects to have all the options to compile it. Get them
-                        if (project.Type() == VSProject.ProjectType.UnitTest)
+                //If it is a unit test, we expect referenced projects (not dynamic libraries) to have all the options to compile it
+                if (project.Type() == VSProject.ProjectType.UnitTest)
+                {
+                    foreach (string referencedProject in project.ReferencedProjects)
+                    {
+                        if (m_projectsByName[referencedProject].Type() != VSProject.ProjectType.DynamicLibrary)
                         {
                             //add secondary lib dependencies
                             foreach (string dependency in m_projectsByName[referencedProject].LibraryDependencies)
@@ -120,11 +128,12 @@ namespace VSLinuxMakefiler
                             //add secondary additional link options
                             if (m_projectsByName[referencedProject].AdditionalLinkOptions != null && m_projectsByName[referencedProject].AdditionalLinkOptions != "")
                                 project.AdditionalLinkOptions += m_projectsByName[referencedProject].AdditionalLinkOptions;
+                            //add secondary additional compile options
+                            if (m_projectsByName[referencedProject].AdditionalCompileOptions != null && m_projectsByName[referencedProject].AdditionalCompileOptions != "")
+                                project.AdditionalCompileOptions += m_projectsByName[referencedProject].AdditionalCompileOptions;
                         }
                     }
                 }
-                project.ReferencedProjects.AddRange(secondaryReferences);
-                secondaryReferences.Clear();
             }
             //3. Sort the projects according to dependencies
             const int maxNumIterations = 100;
@@ -176,13 +185,13 @@ namespace VSLinuxMakefiler
                 writer.WriteLine(CreateFolderStructure);
 
                 //Build all the projects
-                writer.WriteLine("echo #### 1. Compile the projects");
+                writer.WriteLine("echo \"#### 1. Compile the projects\"");
                 foreach (VSProject project in m_projects) project.WriteBuildScript(writer);
 
                 //Run all the tests
-                writer.WriteLine("echo #### 2. Run unit tests");
+                writer.WriteLine("echo \"#### 2. Run unit tests\"");
                 foreach (VSProject project in m_projects)
-                    if (project.Type() ==VSProject.ProjectType.UnitTest)
+                    if (project.Type() == VSProject.ProjectType.UnitTest)
                         writer.WriteLine (project.SolutionRelativeOutputFile());
             }
         }

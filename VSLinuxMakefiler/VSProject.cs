@@ -28,6 +28,7 @@ namespace VSLinuxMakefiler
         public List<string> AdditionalSources { get; } = new List<string>();
         public List<string> AdditionalLibraryDirectories { get; } = new List<string>();
         public string AdditionalLinkOptions { get; set; } = "";
+        public string AdditionalCompileOptions { get; set; } = "";
         public Dictionary<string, string> AdditionalSourcesToCopyMapping { get; } = new Dictionary<string, string>();
 
         public bool SuccessfullyParsed { get; set; } = false;
@@ -87,6 +88,7 @@ namespace VSLinuxMakefiler
         const string LibraryDependenciesXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:LibraryDependencies";
         const string AdditionalLibraryDirectoriesXPath= "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalLibraryDirectories";
         const string AdditionalLinkOptionsXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:Link/MsBuild:AdditionalOptions";
+        const string AdditionalCompileOptionsXPath = "MsBuild:Project/MsBuild:ItemDefinitionGroup/MsBuild:ClCompile/MsBuild:AdditionalOptions";
 
         const string SourceFileAttr = "Include";
 
@@ -152,9 +154,11 @@ namespace VSLinuxMakefiler
 
             //Additional link options
             foreach (XmlNode node in doc.SelectNodes(AdditionalLinkOptionsXPath, nsmgr))
-            {
                 AdditionalLinkOptions = node.InnerText; //if there are different configurations, just take the last one
-            }
+
+            //Additional compile options
+            foreach (XmlNode node in doc.SelectNodes(AdditionalCompileOptionsXPath, nsmgr))
+                AdditionalCompileOptions = node.InnerText; //if there are different configurations, just take the last one
 
             //Additional sources to copy mapping
             foreach (XmlNode node in doc.SelectNodes(AdditionalSourcesToCopyMappingXPath, nsmgr))

@@ -97,6 +97,11 @@ namespace VSLinuxMakefiler
                 linkCommand += " \"" + referencedProjectOutput + "\""; //don't use in the linking phase unless it's a static
             foreach (string dependency in LibraryDependencies)
                 linkCommand += " -l\"" + dependency + "\"";
+
+            //a little hack to let static libraries set the dependencies as additional compile options (ignored when compiling them)
+            if (AdditionalCompileOptions != null)
+                linkCommand += " " + AdditionalCompileOptions;
+
             foreach (string additionalDir in AdditionalLibraryDirectories)
                 linkCommand += " -Wl,-L\"" + ProjectFolder + "/" + additionalDir + "\"";
             if (AdditionalSourcesToCopyMapping.Keys.Count > 0)
