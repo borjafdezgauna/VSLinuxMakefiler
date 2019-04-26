@@ -85,7 +85,7 @@ namespace VSLinuxMakefiler
 
         protected override void WriteCompileSources(StreamWriter writer)
         {
-            writer.WriteLine(m_compilerExecutable + " " + CompilerFlags(null) + PreprocessedSourceFile + " -o " + PreprocessedSourceFile + ".o");
+            writer.WriteLine(m_compilerExecutable + " " + CompilerFlags(null) + PreprocessedSourceFile + " -I" + LinuxCppUnitTestHeaderDir + " -o " + PreprocessedSourceFile + ".o");
         }
 
         protected override void WriteLinkSources(StreamWriter writer)
@@ -93,7 +93,7 @@ namespace VSLinuxMakefiler
             //This base implementation works for dynamic libs and executables
             string linkCommand;
 
-            linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile() + " -I" + LinuxCppUnitTestHeaderDir + " " + PreprocessedSourceFile + ".o " + LinkerFlags();
+            linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile() + " " + PreprocessedSourceFile + ".o " + LinkerFlags();
             foreach (string referencedProjectOutput in ReferencedProjectsOutputs)
                 linkCommand += " \"" + referencedProjectOutput + "\""; //don't use in the linking phase unless it's a static
             foreach (string dependency in LibraryDependencies)
