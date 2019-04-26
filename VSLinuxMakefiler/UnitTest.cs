@@ -74,17 +74,18 @@ namespace VSLinuxMakefiler
 
         public override string CompilerFlags(string sourceFile)
         {
-             return "";
+             return "-c -x c++ -std=c++11 ";
         }
 
         public override string LinkerFlags()
         {
+            //We add here the compiler flags, since we're compiling/linking with a single command
             return "-Wl,--no-undefined ";
         }
 
         protected override void WriteCompileSources(StreamWriter writer)
         {
-            //Do nothing, we wanto to compile/link in a single command
+            writer.WriteLine(m_compilerExecutable + " " + CompilerFlags(null) + PreprocessedSourceFile + " -o " + PreprocessedSourceFile + ".o");
         }
 
         protected override void WriteLinkSources(StreamWriter writer)
@@ -92,7 +93,7 @@ namespace VSLinuxMakefiler
             //This base implementation works for dynamic libs and executables
             string linkCommand;
 
-            linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile() + " -I" + LinuxCppUnitTestHeaderDir + " " + PreprocessedSourceFile + " " + LinkerFlags();
+            linkCommand = m_compilerExecutable + " -o " + SolutionRelativeOutputFile() + " -I" + LinuxCppUnitTestHeaderDir + " " + PreprocessedSourceFile + ".o " + LinkerFlags();
             foreach (string referencedProjectOutput in ReferencedProjectsOutputs)
                 linkCommand += " \"" + referencedProjectOutput + "\""; //don't use in the linking phase unless it's a static
             foreach (string dependency in LibraryDependencies)
