@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace VSLinuxMakefiler
 {
@@ -9,11 +10,11 @@ namespace VSLinuxMakefiler
     {
         const string projDefPattern = "Project\\([^\\)]+\\)\\s*=\\s*\"([^\"]+)\"\\s*\\,\\s*\"([^\"]+)\"\\s*\\,\\s*";
 
-        List<VSLinuxProject> m_projects = new List<VSLinuxProject>();
-        Dictionary<string, VSLinuxProject> m_projectsByName = new Dictionary<string, VSLinuxProject>();
+        List<VSProject> m_projects = new List<VSProject>();
+        Dictionary<string, VSProject> m_projectsByName = new Dictionary<string, VSProject>();
         string m_solutionPath = null;
 
-        public bool Parse(string solutionFilename)
+        public bool Parse(string solutionFilename, string linuxCppUnitTestHeaderDir)
         {
             if (!File.Exists(solutionFilename))
                 return false;
@@ -27,10 +28,22 @@ namespace VSLinuxMakefiler
                 projectName = match.Groups[1].Value.Replace('\\','/');
                 projectPath = match.Groups[2].Value.Replace('\\', '/');
 
-                if (projectPath.EndsWith("-linux.vcxproj"))
+                if (projectPath.EndsWith(".vcxproj"))
                 {
-                    VSLinuxProject project = new VSLinuxProject(projectName, projectPath, m_solutionPath);
-                    if (project.SuccessfullyParsed)
+                    VSProject.ProjectType type = VSProject.GetProjectType(m_solutionPath + "/" + projectPath);
+                    VSProject project = null;
+                    switch (type)
+                    {
+                        case VSProject.ProjectType.DynamicLibrary: project = new DynamicLib(projectName, projectPath, m_solutionPath); break;
+                        case VSProject.ProjectType.StaticLibrary: project = new StaticLib(projectName, projectPath, m_solutionPath); break;
+                        case VSProject.ProjectType.Executable: project = new Executable(projectName, projectPath, m_solutionPath); break;
+                        case VSProject.ProjectType.UnitTest:
+                            //we only parse unit tests if the dir of the linux cppUnitTest headers was given
+                            if (linuxCppUnitTestHeaderDir != null)
+                                project = new UnitTest(projectName, projectPath, m_solutionPath, linuxCppUnitTestHeaderDir); break;
+                        default: break;
+                    }
+                    if (project != null && project.SuccessfullyParsed)
                     {
                         m_projects.Add(project);
                         m_projectsByName[projectName] = project;
@@ -45,6 +58,7 @@ namespace VSLinuxMakefiler
             int index = m_projects.FindIndex(project => project.Name == projectName);
             return index;
         }
+
         bool FixFirstDependencyOrderError()
         {
             for(int i= 0; i<m_projects.Count; i++)
@@ -55,7 +69,7 @@ namespace VSLinuxMakefiler
                     if (referencedProjectIndex > i)
                     {
                         //swap
-                        VSLinuxProject tmp;
+                        VSProject tmp;
                         tmp = m_projects[i];
                         m_projects[i] = m_projects[referencedProjectIndex];
                         m_projects[referencedProjectIndex] = tmp;
@@ -65,8 +79,63 @@ namespace VSLinuxMakefiler
             }
             return true;
         }
-        void SortProjects()
+
+        void SortProjectsAndReferences()
         {
+            //1. Pre-process referenced projects so that unit tests reference the linux version of the projects (ending with "-linux")
+            foreach (VSProject project in m_projects)
+            {
+                for (int i= 0; i<project.ReferencedProjects.Count; i++)
+                {
+                    string reference = project.ReferencedProjects[i];
+                    //if the referenced project hasn't been loaded (is unsupported) and the linux version has been loaded, fix the reference
+                    if (!m_projectsByName.ContainsKey(reference) && m_projectsByName.ContainsKey(reference + "-linux"))
+                        project.ReferencedProjects[i] = reference + "-linux";
+                }
+            }
+            //2. Add secondary project references
+            List<string> secondaryReferences = new List<string>();
+            List<string> secondaryReferenceLibDependencies = new List<string>();
+            List<string> secondaryReferenceAdditionalDirectories = new List<string>();
+            foreach (VSProject project in m_projects)
+            {
+                foreach (string referencedProject in project.ReferencedProjects)
+                {
+                    foreach (string secondaryReference in m_projectsByName[referencedProject].ReferencedProjects)
+                    {
+                        if (!project.ReferencedProjects.Contains(secondaryReference) && !secondaryReferences.Contains(secondaryReference))
+                            secondaryReferences.Add(secondaryReference);
+                    }
+                }
+                project.ReferencedProjects.AddRange(secondaryReferences);
+                secondaryReferences.Clear();
+
+                //If it is a unit test, we expect referenced projects (not dynamic libraries) to have all the options to compile it
+                if (project.Type() == VSProject.ProjectType.UnitTest)
+                {
+                    foreach (string referencedProject in project.ReferencedProjects)
+                    {
+                        if (m_projectsByName[referencedProject].Type() != VSProject.ProjectType.DynamicLibrary)
+                        {
+                            //add secondary lib dependencies
+                            foreach (string dependency in m_projectsByName[referencedProject].LibraryDependencies)
+                                if (!project.LibraryDependencies.Contains(dependency))
+                                    project.LibraryDependencies.Add(dependency);
+                            //add secondary additional directories
+                            foreach (string additionalLibraryDirectory in m_projectsByName[referencedProject].AdditionalLibraryDirectories)
+                                if (!project.AdditionalLibraryDirectories.Contains(additionalLibraryDirectory))
+                                    project.LibraryDependencies.Add(additionalLibraryDirectory);
+                            //add secondary additional link options
+                            if (m_projectsByName[referencedProject].AdditionalLinkOptions != null && m_projectsByName[referencedProject].AdditionalLinkOptions != "")
+                                project.AdditionalLinkOptions += m_projectsByName[referencedProject].AdditionalLinkOptions;
+                            //add secondary additional compile options
+                            if (m_projectsByName[referencedProject].AdditionalCompileOptions != null && m_projectsByName[referencedProject].AdditionalCompileOptions != "")
+                                project.AdditionalCompileOptions += m_projectsByName[referencedProject].AdditionalCompileOptions;
+                        }
+                    }
+                }
+            }
+            //3. Sort the projects according to dependencies
             const int maxNumIterations = 100;
             int numIterations = 0;
             bool projectsOrdered = FixFirstDependencyOrderError();
@@ -75,40 +144,55 @@ namespace VSLinuxMakefiler
                 projectsOrdered = FixFirstDependencyOrderError();
                 numIterations++;
             }
+            if (numIterations == maxNumIterations)
+            {
+                Console.WriteLine("Warning: maximum number of iterations reached while sorting projects and references");
+            }
+            //3. Reorder referenced projects and resolve references
+            foreach(VSProject project in m_projects)
+            {
+                project.ReferencedProjects.Sort((x, y) => ProjectIndex(y).CompareTo(ProjectIndex(x)));
+
+                //Resolve dependencies
+                foreach (string reference in project.ReferencedProjects)
+                {
+                    //for simplicity, we only include referenced static libraries in the linking phase
+                    if (m_projectsByName[reference].Type() == VSProject.ProjectType.StaticLibrary)
+                        project.ReferencedProjectsOutputs.Add(m_projectsByName[reference].SolutionRelativeOutputFile());
+                }
+            }
         }
 
-        string CreateFolderStructure = "mkdir tmp\n";
+        readonly string CreateFolderStructure = "mkdir tmp\n";
 
         public void GenerateBuildFile()
         {
-            //1. Resolve dependencies
-            foreach(VSLinuxProject project in m_projects)
-            {
-                //Resolve dependencies
-                foreach(string reference in project.ReferencedProjects)
-                    project.ReferencedProjectsOutputs.Add(m_projectsByName[reference].SolutionRelativeOutputFile);
-            }
-            //2. Sort projects according to the dependencies
-            SortProjects();
+            //1. Resolve referenced projects, and sort the projects/references them according to the dependencies
+            SortProjectsAndReferences();
 
-            //3. Generate the build file
-            string outputFilename = m_solutionPath + "/build-linux.sh";
+            //2. Generate the build file
+            string outputFilename = m_solutionPath + "/linux-ci-build.sh";
 
-            Console.WriteLine("Generating build script " + outputFilename);
+            Console.WriteLine("Generating CI script " + outputFilename);
             Console.WriteLine("VSLinux projects: ");
-            foreach (VSLinuxProject project in m_projects)
+            foreach (VSProject project in m_projects)
             {
-                Console.WriteLine("[" + project.Type + "] " + project.Name + " (" + project.SolutionRelativePath + ")");
+                Console.WriteLine("[" + project.Type() + "] " + project.Name + " (" + project.SolutionRelativePath + ")");
             }
 
             using (StreamWriter writer = File.CreateText(outputFilename))
             {
                 writer.WriteLine(CreateFolderStructure);
 
-                foreach (VSLinuxProject project in m_projects)
-                {
-                    project.WriteBuildScript(writer);
-                }
+                //Build all the projects
+                writer.WriteLine("echo \"#### 1. Compile the projects\"");
+                foreach (VSProject project in m_projects) project.WriteBuildScript(writer);
+
+                //Run all the tests
+                writer.WriteLine("echo \"#### 2. Run unit tests\"");
+                foreach (VSProject project in m_projects)
+                    if (project.Type() == VSProject.ProjectType.UnitTest)
+                        writer.WriteLine (project.SolutionRelativeOutputFile());
             }
         }
     }
