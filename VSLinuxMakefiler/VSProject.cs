@@ -67,6 +67,7 @@ namespace VSLinuxMakefiler
                         if (configType.InnerText == "StaticLibrary") return ProjectType.StaticLibrary;
                         else if (configType.InnerText == "DynamicLibrary") return ProjectType.DynamicLibrary;
                     }
+                    return ProjectType.Executable;
                 }
             }
             foreach (XmlNode node in doc.SelectNodes(ProjectSubTypeXPath, nsmgr))

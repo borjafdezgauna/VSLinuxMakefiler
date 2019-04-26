@@ -82,7 +82,7 @@ namespace VSLinuxMakefiler
 
         void SortProjectsAndReferences()
         {
-            //0. Pre-process referenced projects so that unit tests reference the linux version of the projects (ending with "-linux")
+            //1. Pre-process referenced projects so that unit tests reference the linux version of the projects (ending with "-linux")
             foreach (VSProject project in m_projects)
             {
                 for (int i= 0; i<project.ReferencedProjects.Count; i++)
@@ -93,7 +93,20 @@ namespace VSLinuxMakefiler
                         project.ReferencedProjects[i] = reference + "-linux";
                 }
             }
-            //1. Sort the projects
+            //2. Add secondary project references
+            List<string> secondaryReferences = new List<string>();
+            foreach (VSProject project in m_projects)
+            {
+                foreach (string referencedProject in project.ReferencedProjects)
+                {
+                    foreach (string secondaryReference in m_projectsByName[referencedProject].ReferencedProjects)
+                        if (!project.ReferencedProjects.Contains(secondaryReference) && !secondaryReferences.Contains(secondaryReference))
+                            secondaryReferences.Add(secondaryReference);
+                }
+                project.ReferencedProjects.AddRange(secondaryReferences);
+                secondaryReferences.Clear();
+            }
+            //3. Sort the projects according to dependencies
             const int maxNumIterations = 100;
             int numIterations = 0;
             bool projectsOrdered = FixFirstDependencyOrderError();
@@ -106,7 +119,7 @@ namespace VSLinuxMakefiler
             {
                 Console.WriteLine("Warning: maximum number of iterations reached while sorting projects and references");
             }
-            //2. Reorder referenced projects and resolve references
+            //3. Reorder referenced projects and resolve references
             foreach(VSProject project in m_projects)
             {
                 project.ReferencedProjects.Sort((x, y) => ProjectIndex(y).CompareTo(ProjectIndex(x)));
