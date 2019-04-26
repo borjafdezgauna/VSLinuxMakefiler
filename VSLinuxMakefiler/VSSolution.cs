@@ -95,13 +95,33 @@ namespace VSLinuxMakefiler
             }
             //2. Add secondary project references
             List<string> secondaryReferences = new List<string>();
+            List<string> secondaryReferenceLibDependencies = new List<string>();
+            List<string> secondaryReferenceAdditionalDirectories = new List<string>();
             foreach (VSProject project in m_projects)
             {
                 foreach (string referencedProject in project.ReferencedProjects)
                 {
                     foreach (string secondaryReference in m_projectsByName[referencedProject].ReferencedProjects)
+                    {
                         if (!project.ReferencedProjects.Contains(secondaryReference) && !secondaryReferences.Contains(secondaryReference))
                             secondaryReferences.Add(secondaryReference);
+
+                        //If it is a unit test, we expect referenced projects to have all the options to compile it. Get them
+                        if (project.Type() == VSProject.ProjectType.UnitTest)
+                        {
+                            //add secondary lib dependencies
+                            foreach (string dependency in m_projectsByName[referencedProject].LibraryDependencies)
+                                if (!project.LibraryDependencies.Contains(dependency))
+                                    project.LibraryDependencies.Add(dependency);
+                            //add secondary additional directories
+                            foreach (string additionalLibraryDirectory in m_projectsByName[referencedProject].AdditionalLibraryDirectories)
+                                if (!project.AdditionalLibraryDirectories.Contains(additionalLibraryDirectory))
+                                    project.LibraryDependencies.Add(additionalLibraryDirectory);
+                            //add secondary additional link options
+                            if (m_projectsByName[referencedProject].AdditionalLinkOptions != null && m_projectsByName[referencedProject].AdditionalLinkOptions != "")
+                                project.AdditionalLinkOptions += m_projectsByName[referencedProject].AdditionalLinkOptions;
+                        }
+                    }
                 }
                 project.ReferencedProjects.AddRange(secondaryReferences);
                 secondaryReferences.Clear();
