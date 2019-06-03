@@ -67,9 +67,9 @@ namespace VSLinuxMakefiler
         public const string OutputFileHeader = "#include <iostream>";
         public const string OutputFileIncludeUnitTestSource = "#include \"{0}\"";
         public const string OutputFileIncludeUnit = "#include \"{0}\"";
-        public const string OutputFileBeginMain = "int main()\n{\n  bool success= true;\n";
-        public const string OutputFileEndMain = "  return success;\n}";
-        public const string OutputFileTestMethod = "  try\n  {{\n    {0}::{1}::{2}();\n    std::cout << \"Passed {2}()\\n\";\n  }}\n  catch(std::runtime_error error)\n  {{\n    success= false;\n"
+        public const string OutputFileBeginMain = "int main()\n{\n  int retCode= 0;\n";
+        public const string OutputFileEndMain = "  return retCode;\n}";
+        public const string OutputFileTestMethod = "  try\n  {{\n    {0}::{1}::{2}();\n    std::cout << \"Passed {2}()\\n\";\n  }}\n  catch(std::runtime_error error)\n  {{\n    retCode= 1;\n"
             + "    std::cout << \"Failed {2}()\\n\";\n  }}";
 
         public override string CompilerFlags(string sourceFile)
