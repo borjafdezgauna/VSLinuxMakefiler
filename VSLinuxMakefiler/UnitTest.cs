@@ -64,7 +64,7 @@ namespace VSLinuxMakefiler
         }
 
         //Constants used to generate the preprocessed source file
-        public const string OutputFileHeader = "#include <iostream>";
+        public const string OutputFileHeader = "#include <iostream>\n#include <stdexcept>";
         public const string OutputFileIncludeUnitTestSource = "#include \"{0}\"";
         public const string OutputFileIncludeUnit = "#include \"{0}\"";
         public const string OutputFileBeginMain = "int main()\n{\n  int retCode= 0;\n";
